@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Birthdate Manager</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 2em;
+      background-color: #f0f2f5;
+      color: #333;
+    }
+    h1, h2 {
+      color: #2c3e50;
+    }
+    input, button, select {
+      padding: 0.7em;
+      margin: 0.5em 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      font-size: 1em;
+    }
+    input:focus, select:focus {
+      border-color: #5a67d8;
+      outline: none;
+    }
+    button {
+      background-color: #5a67d8;
+      color: white;
+      border: none;
+      transition: background-color 0.3s ease;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #434190;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      max-width: 400px;
+      margin-bottom: 1em;
+    }
+
+    .person {
+      background-color: #fff;
+      padding: 1em;
+      margin: 1em 0;
+      border-left: 5px solid #5a67d8;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      transition: transform 0.3s ease;
+    }
+    .person:hover {
+      transform: scale(1.01);
+    }
+
+    .comparison-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 400px;
+      gap: 0.5em;
+    }
+
+    .suggestion-box {
+      position: relative;
+      background-color: white;
+      border: 1px solid #ccc;
+      max-height: 150px;
+      overflow-y: auto;
+      border-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .suggestion-box div {
+      padding: 0.5em;
+      cursor: pointer;
+    }
+    .suggestion-box div:hover {
+      background-color: #edf2ff;
+    }
+
+    #comparisonOutput {
+      margin-top: 1em;
+      background: #e9efff;
+      padding: 1em;
+      border-left: 5px solid #4c51bf;
+      border-radius: 5px;
+    }
+
+    .fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+  <h1>Birthdate Manager</h1>
+
+  <div class="form-group">
+    <label>Name:</label>
+    <input id="name" placeholder="Enter name..." />
+    <label>Date of Birth:</label>
+    <input id="dob" type="date" />
+    <button onclick="addPerson()">Add Person</button>
+  </div>
+
+  <div class="form-group">
+    <label>Sort List:</label>
+    <select id="sort" onchange="loadPeople()">
+      <option value="youngest">Youngest First</option>
+      <option value="oldest">Oldest First</option>
+    </select>
+  </div>
+
+  <h2>Saved People</h2>
+  <div id="peopleList"></div>
+
+  <h2>Compare Ages</h2>
+  <div class="comparison-row">
+    <input type="text" id="person1Input" placeholder="Type first name..." oninput="showSuggestions(this, 'suggestions1')" autocomplete="off"/>
+    <div id="suggestions1" class="suggestion-box"></div>
+
+    <input type="text" id="person2Input" placeholder="Type second name..." oninput="showSuggestions(this, 'suggestions2')" autocomplete="off"/>
+    <div id="suggestions2" class="suggestion-box"></div>
+
+    <button onclick="compareAges()">Compare Ages</button>
+  </div>
+
+  <div id="comparisonOutput"></div>
+
+  <script>
+    const monthNames = ["January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December"];
+    let peopleList = [];
+
+    function addPerson() {
+      const name = document.getElementById("name").value.trim();
+      const dob = document.getElementById("dob").value;
+
+      if (!name || !dob) {
+        alert("Please enter both name and date of birth.");
+        return;
+      }
+
+      const [year, month, day] = dob.split("-").map(Number);
+
+      const newPerson = { name, year, month: month - 1, day };
+
+      const existing = peopleList.find(p => p.name.toLowerCase() === name.toLowerCase());
+      if (existing) {
+        alert("This name already exists.");
+        return;
+      }
+
+      peopleList.push(newPerson);
+      localStorage.setItem("people", JSON.stringify(peopleList));
+      document.getElementById("name").value = "";
+      document.getElementById("dob").value = "";
+      loadPeople();
+    }
+
+    function deletePerson(name) {
+      peopleList = peopleList.filter(p => p.name !== name);
+      localStorage.setItem("people", JSON.stringify(peopleList));
+      loadPeople();
+    }
+
+    function loadPeople() {
+      peopleList = JSON.parse(localStorage.getItem("people") || "[]");
+      const sort = document.getElementById("sort").value;
+      peopleList.sort((a, b) => {
+        const d1 = new Date(a.year, a.month, a.day);
+        const d2 = new Date(b.year, b.month, b.day);
+        return sort === "youngest" ? d2 - d1 : d1 - d2;
+      });
+
+      const container = document.getElementById("peopleList");
+      container.innerHTML = "";
+
+      peopleList.forEach(p => {
+        const dob = new Date(p.year, p.month, p.day);
+        const now = new Date();
+        let y = now.getFullYear() - p.year;
+        let m = now.getMonth() - p.month;
+        let d = now.getDate() - p.day;
+        if (d < 0) { m--; d += new Date(now.getFullYear(), now.getMonth(), 0).getDate(); }
+        if (m < 0) { y--; m += 12; }
+
+        const weekday = dob.toLocaleDateString("en-US", { weekday: "long" });
+        const personDiv = document.createElement("div");
+        personDiv.className = "person fade-in";
+        personDiv.innerHTML = `
+          <strong>${p.name}</strong><br>
+          DOB: ${monthNames[p.month]} ${p.day}, ${p.year} (${weekday})<br>
+          Age: ${y} years, ${m} months, ${d} days<br>
+          <button onclick="deletePerson('${p.name}')">Delete</button>
+        `;
+        container.appendChild(personDiv);
+      });
+    }
+
+    function showSuggestions(input, suggestionBoxId) {
+      const suggestions = document.getElementById(suggestionBoxId);
+      const query = input.value.toLowerCase();
+      suggestions.innerHTML = "";
+      if (!query) return;
+
+      const matches = peopleList.filter(p => p.name.toLowerCase().startsWith(query));
+      matches.forEach(p => {
+        const div = document.createElement("div");
+        div.textContent = p.name;
+        div.onclick = () => {
+          input.value = p.name;
+          suggestions.innerHTML = "";
+        };
+        suggestions.appendChild(div);
+      });
+    }
+
+    function compareAges() {
+      const name1 = document.getElementById("person1Input").value.trim();
+      const name2 = document.getElementById("person2Input").value.trim();
+      const output = document.getElementById("comparisonOutput");
+
+      if (!name1 || !name2) {
+        output.innerHTML = "Please enter both names.";
+        return;
+      }
+
+      if (name1.toLowerCase() === name2.toLowerCase()) {
+        output.innerHTML = "Please enter two different names.";
+        return;
+      }
+
+      const p1 = peopleList.find(p => p.name.toLowerCase() === name1.toLowerCase());
+      const p2 = peopleList.find(p => p.name.toLowerCase() === name2.toLowerCase());
+
+      if (!p1 || !p2) {
+        output.innerHTML = "One or both names not found.";
+        return;
+      }
+
+      const d1 = new Date(p1.year, p1.month, p1.day);
+      const d2 = new Date(p2.year, p2.month, p2.day);
+
+      let older = d1 < d2 ? p1 : p2;
+      let younger = d1 < d2 ? p2 : p1;
+
+      let yDiff = younger.year - older.year;
+      let mDiff = younger.month - older.month;
+      let dDiff = younger.day - older.day;
+
+      if (dDiff < 0) {
+        mDiff--;
+        dDiff += new Date(younger.year, younger.month, 0).getDate();
+      }
+
+      if (mDiff < 0) {
+        yDiff--;
+        mDiff += 12;
+      }
+
+      output.innerHTML = `
+        <strong>Comparison:</strong><br>
+        ${older.name} is older than ${younger.name} by:<br>
+        ${yDiff} years, ${mDiff} months, ${dDiff} days<br><br>
+        <strong>${p1.name}</strong>: ${monthNames[p1.month]} ${p1.day}, ${p1.year}<br>
+        <strong>${p2.name}</strong>: ${monthNames[p2.month]} ${p2.day}, ${p2.year}
+      `;
+    }
+
+    window.onload = loadPeople;
+  </script>
+</body>
+</html>
